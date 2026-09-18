@@ -61,8 +61,8 @@ struct ToastModifier: ViewModifier {
                         .animation(.spring(), value: toast.message)
                         .onAppear {
                             workItem?.cancel()
-                            let item = DispatchWorkItem { in
-                                if item?.isCancelled == false {
+                            let item = DispatchWorkItem {
+                                if item.isCancelled == false {
                                     withAnimation { self.toast = nil }
                                 }
                             }
