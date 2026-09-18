@@ -17,11 +17,7 @@ name: Build iOS IPA
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "SocialApp/**"
-      - "project.yml"
-      - "Package.swift"
+    branches: [main, master]
   workflow_dispatch: # 手动触发
 
 concurrency:
