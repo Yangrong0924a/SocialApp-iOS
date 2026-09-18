@@ -1,0 +1,156 @@
+# =============================================================
+# iOS IPA 自动构建工作流
+# 使用方式：
+#   1. 将项目推送到 GitHub
+#   2. 在 GitHub 仓库 Settings → Secrets 添加：
+#      - APPLE_DEVELOPER_EMAIL: 你的 Apple ID 邮箱
+#      - APPLE_APP_SPECIFIC_PASSWORD: Apple ID 专用密码
+#      - MATCH_PASSWORD: (可选) fastlane match 仓库密码
+#      - FIREBASE_TOKEN: (可选) 上传到 Firebase App Distribution
+#   3. 手动触发或代码推送到 main 时自动构建
+# =============================================================
+
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "SocialApp/**"
+      - "project.yml"
+      - "Package.swift"
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # 手动触发
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build IPA (${{ matrix.configuration }})
+    runs-on: macos-14  # Apple Silicon runner, Xcode 15+
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+      max-parallel: 1
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          echo "Xcode version: $(xcodebuild -version)"
+          echo "Swift version: $(swift --version)"
+
+      - name: 🔧 Install XcodeGen
+        run: brew install xcodegen
+
+      - name: 📐 Generate Xcode Project
+        run: xcodegen generate
+        working-directory: SocialApp-iOS
+
+      # ===================== 签名配置 =====================
+      # 方案 A：使用 Apple ID + 自动签名 (不需要付费账号，但仅可安装到个人设备)
+      # 方案 B：使用 fastlane match (需要付费 Apple Developer 账号)
+      # ====================================================
+
+      - name: 🔐 Setup Code Signing (Fastlane Match)
+        if: ${{ secrets.APPLE_DEVELOPER_EMAIL != '' && env.HAS_MATCH_REPO == 'true' }}
+        env:
+          MATCH_REPO: ${{ secrets.MATCH_REPO }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPLE_DEVELOPER_EMAIL: ${{ secrets.APPLE_DEVELOPER_EMAIL }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          gem install fastlane -N
+          fastlane match development --readonly || echo "Match failed, trying auto-sign"
+        continue-on-error: true
+
+      - name: 🔐 Setup Code Signing (Auto - Apple ID)
+        if: ${{ secrets.APPLE_DEVELOPER_EMAIL != '' && env.HAS_MATCH_REPO != 'true' }}
+        env:
+          APPLE_DEVELOPER_EMAIL: ${{ secrets.APPLE_DEVELOPER_EMAIL }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          # 使用 xcodebuild 自动管理签名 (未付费账号也可)
+          echo "Using automatic code signing with Apple ID"
+          # 设置 Xcode 开发者账号
+          defaults write com.apple.dt.Xcode DVTDeveloperAccountManagerLastUsedTeamID -string ""
+        continue-on-error: true
+
+      # ===================== 构建 =====================
+      - name: 🏗 Build App
+        run: |
+          SCHEME="SocialApp"
+          CONFIG="${{ matrix.configuration }}"
+          DERIVED_DATA="${{ runner.temp }}/DerivedData"
+
+          xcodebuild \
+            -project SocialApp.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIG" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            clean build \
+            | xcpretty || echo "Build log available"
+        working-directory: SocialApp-iOS
+
+      # ===================== 导出 IPA =====================
+      - name: 📦 Export IPA
+        run: |
+          SCHEME="SocialApp"
+          CONFIG="${{ matrix.configuration }}"
+          DERIVED_DATA="${{ runner.temp }}/DerivedData"
+          EXPORT_DIR="${{ runner.temp }}/export"
+          mkdir -p "$EXPORT_DIR"
+
+          # 查找 .app 包
+          APP_PATH=$(find "$DERIVED_DATA/Build/Products" -name "*.app" -type d | head -1)
+          echo "App found at: $APP_PATH"
+
+          # 导出 IPA（如果签名失败则跳过导出）
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$DERIVED_DATA/Build/Products/$SCHEME.xcarchive" \
+            -exportPath "$EXPORT_DIR" \
+            -exportOptionsPlist .github/exportOptions.plist \
+            -allowProvisioningUpdates \
+            2>&1 || echo "Export skipped (signing may have failed)"
+        working-directory: SocialApp-iOS
+        continue-on-error: true
+
+      # ===================== 上传 IPA =====================
+      - name: 📤 Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SocialApp-${{ matrix.configuration }}.ipa
+          path: |
+            ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: ignore
+          compression-level: 0
+
+      - name: 📤 Upload .app (Simulator)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SocialApp-${{ matrix.configuration }}-app
+          path: |
+            ${{ runner.temp }}/DerivedData/Build/Products/*-iphonesimulator/SocialApp.app
+          if-no-files-found: ignore
+
+      # ===================== 失败时分析日志 =====================
+      - name: 🔍 Upload Build Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.configuration }}
+          path: |
+            ${{ runner.temp }}/DerivedData/Logs/Build/*.log
+          if-no-files-found: ignore

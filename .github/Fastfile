@@ -1,0 +1,58 @@
+# Fastlane 自动化配置 (可选)
+# 更高级的签名和发布管理
+# 安装: sudo gem install fastlane -NV
+
+default_platform(:ios)
+
+platform :ios do
+  ################################################################
+  # 构建并导出 IPA
+  # 命令: fastlane ios build
+  ################################################################
+  lane :build do |options|
+    configuration = options[:configuration] || "Release"
+
+    # 使用 XcodeGen 生成项目
+    sh("xcodegen generate") unless File.exist?("SocialApp.xcodeproj")
+
+    # 构建
+    xcodebuild(
+      project: "SocialApp.xcodeproj",
+      scheme: "SocialApp",
+      configuration: configuration,
+      sdk: "iphoneos",
+      derived_data_path: "./DerivedData",
+      xcargs: "CODE_SIGN_STYLE=Automatic COMPILER_INDEX_STORE_ENABLE=NO",
+      clean: true
+    )
+
+    # 导出 IPA
+    gym(
+      scheme: "SocialApp",
+      configuration: configuration,
+      clean: true,
+      export_method: "development",
+      export_xcargs: "-allowProvisioningUpdates",
+      output_name: "SocialApp.ipa"
+    )
+  end
+
+  ################################################################
+  # 获取签名证书 (fastlane match)
+  # 需要配置: match git 仓库
+  # 命令: fastlane ios match_development
+  ################################################################
+  lane :match_development do
+    match(
+      type: "development",
+      readonly: true
+    )
+  end
+
+  lane :match_ad_hoc do
+    match(
+      type: "ad_hoc",
+      readonly: true
+    )
+  end
+end

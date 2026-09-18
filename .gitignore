@@ -1,0 +1,41 @@
+# Xcode
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.xcodeproj/xcuserdata
+*.xcodeproj/project.xcworkspace
+
+# Swift Package Manager
+.build/
+Packages/
+*.swiftpm
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+# macOS
+.DS_Store
+*.pem
+
+# iOS
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Logs
+*.log
+build-*.log
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
