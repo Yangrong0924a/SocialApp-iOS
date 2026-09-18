@@ -45,31 +45,33 @@ jobs:
             -project SocialApp.xcodeproj \
             -scheme SocialApp \
             -configuration Release \
-            -derivedDataPath "${RUNNER_TEMP}/DerivedData" \
+            -derivedDataPath "${RUNNER_TEMP}/DerivedData_Device" \
             -destination 'generic/platform=iOS' \
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE=Automatic \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            clean build || echo "DEVICE_BUILD_FAILED=true" >> $GITHUB_ENV
+            build || echo "DEVICE_BUILD_FAILED=true" >> $GITHUB_ENV
 
       # Debug - show what was built
       - name: Find Build Products
         run: |
           echo "=== Looking for .app files ==="
-          find "${RUNNER_TEMP}/DerivedData" -name "*.app" -type d 2>/dev/null || echo "No .app in RUNNER_TEMP"
-          find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null || echo "No .app in default DerivedData"
+          find "${RUNNER_TEMP}" -name "*.app" -type d 2>/dev/null || echo "No .app found"
           echo ""
-          echo "=== DerivedData structure ==="
-          find "${RUNNER_TEMP}/DerivedData" -maxdepth 5 -type d 2>/dev/null || echo "No DerivedData"
+          echo "=== Runner temp ==="
+          ls -la "${RUNNER_TEMP}"
+          echo ""
+          echo "=== DerivedData ==="
+          ls -la "${RUNNER_TEMP}/DerivedData/Build/Products/" 2>/dev/null || echo "No Products dir"
 
       # Export IPA - create unsigned IPA for testing
       - name: Export IPA
         run: |
-          APP_PATH=$(find "${RUNNER_TEMP}/DerivedData" -name "SocialApp.app" -type d 2>/dev/null | head -1)
-          if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "SocialApp.app" -type d 2>/dev/null | head -1)
+          APP_PATH="${RUNNER_TEMP}/DerivedData/Build/Products/Debug-iphonesimulator/SocialApp.app"
+          if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "${RUNNER_TEMP}/DerivedData" -name "SocialApp.app" -type d 2>/dev/null | head -1)
           fi
-          if [ -z "$APP_PATH" ]; then
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
             echo "ERROR: No SocialApp.app found anywhere!"
             exit 1
           fi
