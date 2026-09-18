@@ -55,12 +55,31 @@ jobs:
             clean build
         continue-on-error: true
 
-      # Export IPA if Device build succeeded and app is signed
+      # Show DerivedData structure for debugging
+      - name: Debug File Structure
+        run: |
+          echo "=== runner.temp ==="
+          echo "${{ runner.temp }}"
+          echo ""
+          echo "=== DerivedData contents ==="
+          find "${{ runner.temp }}/DerivedData" -maxdepth 5 -type d 2>/dev/null | head -30 || echo "No DerivedData found"
+          echo ""
+          echo "=== Build Products search ==="
+          find "${{ runner.temp }}/DerivedData" -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found"
+          echo ""
+          echo "=== Default DerivedData ==="
+          find ~/Library/Developer/Xcode/DerivedData -maxdepth 3 -name "SocialApp*" -type d 2>/dev/null | head -5 || echo "No default DD"
+        continue-on-error: true
+
+      # Export IPA - find .app anywhere
       - name: Export IPA
         run: |
-          APP_PATH=$(find "${{ runner.temp }}/DerivedData/Build/Products/Release-iphoneos" -name "*.app" -type d | head -1)
+          APP_PATH=$(find "${{ runner.temp }}/DerivedData" -name "SocialApp.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP_PATH" ]; then
-            echo "No release .app found"
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "SocialApp.app" -type d 2>/dev/null | head -1)
+          fi
+          if [ -z "$APP_PATH" ]; then
+            echo "No release .app found anywhere"
             exit 0
           fi
 
@@ -70,27 +89,15 @@ jobs:
           cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
           cd "$EXPORT_DIR"
           zip -r SocialApp.ipa Payload/
-          echo "IPA created: $(du -h SocialApp.ipa | cut -f1)"
+          echo "IPA created!"
         continue-on-error: true
 
       # Upload artifacts
-      - name: Upload Simulator .app
+      - name: Upload .app files
         uses: actions/upload-artifact@v4
         with:
-          name: SocialApp-Simulator.app
-          path: ${{ runner.temp }}/DerivedData/Build/Products/Debug-iphonesimulator/SocialApp.app
-          if-no-files-found: ignore
-
-      - name: Upload Device .app
-        uses: actions/upload-artifact@v4
-        with:
-          name: SocialApp-Device.app
-          path: ${{ runner.temp }}/DerivedData/Build/Products/Release-iphoneos/SocialApp.app
-          if-no-files-found: ignore
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: SocialApp.ipa
-          path: ${{ runner.temp }}/export/SocialApp.ipa
+          name: SocialApp-BuildOutput
+          path: |
+            ${{ runner.temp }}/DerivedData/Build/Products/**/SocialApp.app
+            ${{ runner.temp }}/export/*.ipa
           if-no-files-found: ignore
