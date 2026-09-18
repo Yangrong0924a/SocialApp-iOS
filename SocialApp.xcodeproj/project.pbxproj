@@ -38,7 +38,7 @@
 		6E4312FFEB2A295DD0AAD07B /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D66FE1216C636C189E6BEDA5; };
 		19AEEB2BBCA45CB172FE9554 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B042386178951B8A219670E; };
 		AF9A6B9017060DDAADACAC17 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A131B3FC134D0C4F791E72C6; };
-		6551A5CB71ECA2C56407E29B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = ; };
+		6551A5CB71ECA2C56407E29B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2EE19E865E16B7B008DE955F; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -75,6 +75,7 @@
 		0B042386178951B8A219670E /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProfileView.swift"; sourceTree = "<group>"; };
 		A131B3FC134D0C4F791E72C6 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProfileViewModel.swift"; sourceTree = "<group>"; };
 		D90D704416BF18BD1228D8C3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2EE19E865E16B7B008DE955F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		C18BE7EE8AA746D32375932A /* SocialApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SocialApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -190,7 +191,7 @@
 				E07B497ACDE911FDE5989561,
 				6AB9A435E8F819E74B4F6DD9,
 				A24E8BA04E2501137D900A7D,
-				7E9D21583436A47F5A59CEC1,
+				32D1417157AB34807C3D5EBA,
 				D90D704416BF18BD1228D8C3,
 			);
 			name = "SocialApp";
@@ -245,8 +246,8 @@
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (en, Base,);
-			mainGroup = System.Collections.Hashtable['SocialApp'][0];
-			productRefGroup = System.Collections.Hashtable['SocialApp'][0];
+			mainGroup = 869C714687BDE40BFA7EB5D1;
+			productRefGroup = 869C714687BDE40BFA7EB5D1;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (C1013DB35AD48D725E1450F7,);
@@ -258,6 +259,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6551A5CB71ECA2C56407E29B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
