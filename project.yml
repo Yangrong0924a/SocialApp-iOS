@@ -23,8 +23,5 @@ targets:
       INFOPLIST_FILE: SocialApp/Info.plist
       DEVELOPMENT_TEAM: ""
       CODE_SIGN_STYLE: Automatic
-    dependencies:
-      # 取消注释以启用 SocketIO
-      # - carthage: SocketIO
     info:
       path: SocialApp/Info.plist
