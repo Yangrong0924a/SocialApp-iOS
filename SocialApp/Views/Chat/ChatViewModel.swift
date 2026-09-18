@@ -1,4 +1,13 @@
 import Foundation
+// MARK: - Request body helpers
+private struct SendBody: Encodable {
+    let receiver_id: Int
+    let content: String
+}
+private struct UserIDBody: Encodable {
+    let user_id: Int
+}
+
 import SwiftUI
 
 @MainActor
@@ -42,7 +51,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let resp: SendMessageResponse = try await APIService.shared.post(
                 "/api/chat/send",
-                body: (["receiver_id": receiverId, "content": content] as [String: Any])
+                body: SendBody(receiver_id: receiverId, content: content)
             )
             messages.append(resp.userMsg)
             if let botReply = resp.botReply {
@@ -83,7 +92,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let _: FriendActionResponse = try await APIService.shared.post(
                 "/api/friend/accept",
-                body: (["user_id": userId] as [String: Any])
+                body: UserIDBody(user_id: userId)
             )
             await loadChatUsers()
         } catch {
@@ -95,7 +104,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let _: FriendActionResponse = try await APIService.shared.post(
                 "/api/friend/reject",
-                body: (["user_id": userId] as [String: Any])
+                body: UserIDBody(user_id: userId)
             )
             await loadChatUsers()
         } catch {
