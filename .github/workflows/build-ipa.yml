@@ -1,32 +1,13 @@
-# =============================================================
-# iOS IPA 自动构建工作流
-# 使用方式：
-#   1. 推送到 main 分支或手动触发
-#   2. 工作流会自动用 macOS runner 编译
-#   3. 下载生成的 IPA / .app 附件
-#
-# 签名说明：
-#   - 免费 Apple ID: 构建成功但无法签名 → 下载 .app 自己签名后安装
-#   - 付费开发者账号: 在 Settings → Secrets 添加以下内容：
-#     - APPLE_DEVELOPER_EMAIL: Apple ID
-#     - APPLE_APP_SPECIFIC_PASSWORD: Apple ID 专用密码
-#     - APPLE_TEAM_ID: 团队 ID (选填)
-# =============================================================
-
 name: Build iOS IPA
 
 on:
   push:
     branches: [main, master]
-  workflow_dispatch: # 手动触发
+  workflow_dispatch:
 
 concurrency:
   group: ios-build-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  APPLE_DEVELOPER_EMAIL: ${{ secrets.APPLE_DEVELOPER_EMAIL }}
-  APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
 
 jobs:
   build:
@@ -35,30 +16,17 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: 📥 Checkout
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 🔧 Setup Xcode
-              run: |
-                sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-                echo "Xcode version: $(xcodebuild -version)"
-                echo "Swift version: $(swift --version)"
+      - name: Setup Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          echo "Xcode: $(xcodebuild -version | head -1)"
+          echo "Swift: $(swift --version | head -1)"
 
-            - name: 🔧 Install XcodeGen (v2.40.0 for Xcode 15.4)
-              run: |
-                # 下载指定版本的 XcodeGen（兼容 Xcode 15.4）
-                XCODEGEN_VERSION="2.40.0"
-                curl -sL "https://github.com/XcodeGen/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip" -o /tmp/xcodegen.zip
-                sudo mkdir -p /usr/local/xcodegen
-                sudo unzip -o /tmp/xcodegen.zip -d /usr/local/xcodegen/
-                sudo ln -sf /usr/local/xcodegen/xcodegen /usr/local/bin/xcodegen
-                xcodegen --version
-
-            - name: 📐 Generate Xcode Project
-              run: xcodegen generate
-
-      # ===================== 构建 (Simulator) =====================
-            - name: 🏗 Build for Simulator
+      # Build for Simulator (no signing needed)
+      - name: Build for Simulator
         run: |
           xcodebuild \
             -project SocialApp.xcodeproj \
@@ -66,28 +34,15 @@ jobs:
             -configuration Debug \
             -derivedDataPath "${{ runner.temp }}/DerivedData" \
             -destination 'generic/platform=iOS Simulator' \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Automatic \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            clean build \
-            | xcpretty --color && exit ${PIPESTATUS[0]}
+            clean build
         continue-on-error: true
 
-      # ===================== 构建 (真机 - 需要 Apple 开发者账号) =====================
-      - name: 🏗 Build for iOS Device
-        env:
-          APPLE_DEVELOPER_EMAIL: ${{ secrets.APPLE_DEVELOPER_EMAIL }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      # Build for iOS Device (auto-sign, may fail without Apple Developer account)
+      - name: Build for iOS Device
         run: |
-          XCODEBUILD_OPTS="CODE_SIGN_STYLE=Automatic COMPILER_INDEX_STORE_ENABLE=NO"
-
-          if [ -n "$APPLE_DEVELOPER_EMAIL" ]; then
-            echo "Using Apple ID: $APPLE_DEVELOPER_EMAIL"
-            XCODEBUILD_OPTS="$XCODEBUILD_OPTS DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}"
-          fi
-
           xcodebuild \
             -project SocialApp.xcodeproj \
             -scheme SocialApp \
@@ -95,67 +50,47 @@ jobs:
             -derivedDataPath "${{ runner.temp }}/DerivedData" \
             -destination 'generic/platform=iOS' \
             -allowProvisioningUpdates \
-            $XCODEBUILD_OPTS \
-            clean build \
-            | xcpretty --color && exit ${PIPESTATUS[0]}
+            CODE_SIGN_STYLE=Automatic \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            clean build
         continue-on-error: true
 
-      # ===================== 导出 IPA（如果签名成功） =====================
-      - name: 📦 Export IPA (if signed)
+      # Export IPA if Device build succeeded and app is signed
+      - name: Export IPA
         run: |
-          EXPORT_DIR="${{ runner.temp }}/export"
-          mkdir -p "$EXPORT_DIR"
-
           APP_PATH=$(find "${{ runner.temp }}/DerivedData/Build/Products/Release-iphoneos" -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
-            echo "No release .app found, skipping IPA export"
+            echo "No release .app found"
             exit 0
           fi
 
           echo "App found: $APP_PATH"
-
-          codesign -dv "$APP_PATH" 2>&1 && {
-            echo "App is signed, exporting IPA..."
-            mkdir -p "$EXPORT_DIR/Payload"
-            cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
-            cd "$EXPORT_DIR"
-            zip -r SocialApp.ipa Payload/
-            echo "IPA exported: SocialApp.ipa"
-          } || {
-            echo "App not signed, skipping IPA export (use .app with sideloadly)"
-          }
+          EXPORT_DIR="${{ runner.temp }}/export"
+          mkdir -p "$EXPORT_DIR/Payload"
+          cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
+          cd "$EXPORT_DIR"
+          zip -r SocialApp.ipa Payload/
+          echo "IPA created: $(du -h SocialApp.ipa | cut -f1)"
         continue-on-error: true
 
-      # ===================== 上传产物 =====================
-      - name: 📤 Upload Simulator .app
+      # Upload artifacts
+      - name: Upload Simulator .app
         uses: actions/upload-artifact@v4
         with:
           name: SocialApp-Simulator.app
-          path: |
-            ${{ runner.temp }}/DerivedData/Build/Products/Debug-iphonesimulator/SocialApp.app
+          path: ${{ runner.temp }}/DerivedData/Build/Products/Debug-iphonesimulator/SocialApp.app
           if-no-files-found: ignore
 
-      - name: 📤 Upload Device .app (unsigned)
+      - name: Upload Device .app
         uses: actions/upload-artifact@v4
         with:
           name: SocialApp-Device.app
-          path: |
-            ${{ runner.temp }}/DerivedData/Build/Products/Release-iphoneos/SocialApp.app
+          path: ${{ runner.temp }}/DerivedData/Build/Products/Release-iphoneos/SocialApp.app
           if-no-files-found: ignore
 
-      - name: 📤 Upload IPA
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: SocialApp.ipa
-          path: |
-            ${{ runner.temp }}/export/SocialApp.ipa
-          if-no-files-found: ignore
-
-      - name: 📤 Upload Build Logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            ${{ runner.temp }}/DerivedData/Logs/Build/*.log
+          path: ${{ runner.temp }}/export/SocialApp.ipa
           if-no-files-found: ignore
