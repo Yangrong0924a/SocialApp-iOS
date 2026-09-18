@@ -42,12 +42,12 @@ final class ChatViewModel: ObservableObject {
         do {
             let resp: SendMessageResponse = try await APIService.shared.post(
                 "/api/chat/send",
-                body: ["receiver_id": receiverId, "content": content]
+                body: (["receiver_id": receiverId, "content": content] as [String: Any])
             )
             messages.append(resp.userMsg)
             if let botReply = resp.botReply {
                 // 延迟显示 bot 回复
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                try? await Task.sleep(for: .nanoseconds(1_500_000_000))
                 messages.append(botReply)
             }
             SocketService.shared.sendMessage(
@@ -71,7 +71,7 @@ final class ChatViewModel: ObservableObject {
             )
             messages.append(resp.userMsg)
             if let botReply = resp.botReply {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                try? await Task.sleep(for: .nanoseconds(1_500_000_000))
                 messages.append(botReply)
             }
         } catch {
@@ -83,7 +83,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let _: FriendActionResponse = try await APIService.shared.post(
                 "/api/friend/accept",
-                body: ["user_id": userId]
+                body: (["user_id": userId] as [String: Any])
             )
             await loadChatUsers()
         } catch {
@@ -95,7 +95,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let _: FriendActionResponse = try await APIService.shared.post(
                 "/api/friend/reject",
-                body: ["user_id": userId]
+                body: (["user_id": userId] as [String: Any])
             )
             await loadChatUsers()
         } catch {
