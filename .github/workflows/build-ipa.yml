@@ -49,7 +49,6 @@ jobs:
 
       - name: 📐 Generate Xcode Project
         run: xcodegen generate
-        working-directory: SocialApp-iOS
 
       # ===================== 构建 (Simulator) =====================
       - name: 🏗 Build for Simulator
@@ -67,7 +66,6 @@ jobs:
             COMPILER_INDEX_STORE_ENABLE=NO \
             clean build \
             | xcpretty --color && exit ${PIPESTATUS[0]}
-        working-directory: SocialApp-iOS
         continue-on-error: true
 
       # ===================== 构建 (真机 - 需要 Apple 开发者账号) =====================
@@ -78,7 +76,6 @@ jobs:
         run: |
           XCODEBUILD_OPTS="CODE_SIGN_STYLE=Automatic COMPILER_INDEX_STORE_ENABLE=NO"
 
-          # 如果有 Apple 开发者账号则尝试使用
           if [ -n "$APPLE_DEVELOPER_EMAIL" ]; then
             echo "Using Apple ID: $APPLE_DEVELOPER_EMAIL"
             XCODEBUILD_OPTS="$XCODEBUILD_OPTS DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}"
@@ -94,7 +91,6 @@ jobs:
             $XCODEBUILD_OPTS \
             clean build \
             | xcpretty --color && exit ${PIPESTATUS[0]}
-        working-directory: SocialApp-iOS
         continue-on-error: true
 
       # ===================== 导出 IPA（如果签名成功） =====================
@@ -103,7 +99,6 @@ jobs:
           EXPORT_DIR="${{ runner.temp }}/export"
           mkdir -p "$EXPORT_DIR"
 
-          # 查找 .app
           APP_PATH=$(find "${{ runner.temp }}/DerivedData/Build/Products/Release-iphoneos" -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "No release .app found, skipping IPA export"
@@ -112,7 +107,6 @@ jobs:
 
           echo "App found: $APP_PATH"
 
-          # 检查是否有签名
           codesign -dv "$APP_PATH" 2>&1 && {
             echo "App is signed, exporting IPA..."
             mkdir -p "$EXPORT_DIR/Payload"
@@ -123,7 +117,6 @@ jobs:
           } || {
             echo "App not signed, skipping IPA export (use .app with sideloadly)"
           }
-        working-directory: SocialApp-iOS
         continue-on-error: true
 
       # ===================== 上传产物 =====================
