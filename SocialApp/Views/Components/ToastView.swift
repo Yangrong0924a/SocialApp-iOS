@@ -62,9 +62,7 @@ struct ToastModifier: ViewModifier {
                         .onAppear {
                             workItem?.cancel()
                             let item = DispatchWorkItem {
-                                if item.isCancelled == false {
-                                    withAnimation { self.toast = nil }
-                                }
+                                withAnimation { self.toast = nil }
                             }
                             workItem = item
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: item)
