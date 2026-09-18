@@ -1,5 +1,4 @@
 name: Build iOS IPA
-
 on:
   push:
     branches: [main, master]
@@ -26,78 +25,68 @@ jobs:
           echo "Swift: $(swift --version | head -1)"
 
       # Build for Simulator (no signing needed)
-      - name: Build for Simulator
+      - name: Build for Simulator (Debug)
         run: |
           xcodebuild \
             -project SocialApp.xcodeproj \
             -scheme SocialApp \
             -configuration Debug \
-            -derivedDataPath "${{ runner.temp }}/DerivedData" \
+            -derivedDataPath "${RUNNER_TEMP}/DerivedData" \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             clean build
-        continue-on-error: true
 
-      # Build for iOS Device (auto-sign, may fail without Apple Developer account)
-      - name: Build for iOS Device
+      # Build for iOS Device with automatic signing
+      - name: Build for iOS Device (Release)
         run: |
           xcodebuild \
             -project SocialApp.xcodeproj \
             -scheme SocialApp \
             -configuration Release \
-            -derivedDataPath "${{ runner.temp }}/DerivedData" \
+            -derivedDataPath "${RUNNER_TEMP}/DerivedData" \
             -destination 'generic/platform=iOS' \
             -allowProvisioningUpdates \
             CODE_SIGN_STYLE=Automatic \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            clean build
-        continue-on-error: true
+            clean build || echo "DEVICE_BUILD_FAILED=true" >> $GITHUB_ENV
 
-      # Show DerivedData structure for debugging
-      - name: Debug File Structure
+      # Debug - show what was built
+      - name: Find Build Products
         run: |
-          echo "=== runner.temp ==="
-          echo "${{ runner.temp }}"
+          echo "=== Looking for .app files ==="
+          find "${RUNNER_TEMP}/DerivedData" -name "*.app" -type d 2>/dev/null || echo "No .app in RUNNER_TEMP"
+          find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null || echo "No .app in default DerivedData"
           echo ""
-          echo "=== DerivedData contents ==="
-          find "${{ runner.temp }}/DerivedData" -maxdepth 5 -type d 2>/dev/null | head -30 || echo "No DerivedData found"
-          echo ""
-          echo "=== Build Products search ==="
-          find "${{ runner.temp }}/DerivedData" -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found"
-          echo ""
-          echo "=== Default DerivedData ==="
-          find ~/Library/Developer/Xcode/DerivedData -maxdepth 3 -name "SocialApp*" -type d 2>/dev/null | head -5 || echo "No default DD"
-        continue-on-error: true
+          echo "=== DerivedData structure ==="
+          find "${RUNNER_TEMP}/DerivedData" -maxdepth 5 -type d 2>/dev/null || echo "No DerivedData"
 
-      # Export IPA - find .app anywhere
+      # Export IPA - create unsigned IPA for testing
       - name: Export IPA
         run: |
-          APP_PATH=$(find "${{ runner.temp }}/DerivedData" -name "SocialApp.app" -type d 2>/dev/null | head -1)
+          APP_PATH=$(find "${RUNNER_TEMP}/DerivedData" -name "SocialApp.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "SocialApp.app" -type d 2>/dev/null | head -1)
           fi
           if [ -z "$APP_PATH" ]; then
-            echo "No release .app found anywhere"
-            exit 0
+            echo "ERROR: No SocialApp.app found anywhere!"
+            exit 1
           fi
-
-          echo "App found: $APP_PATH"
-          EXPORT_DIR="${{ runner.temp }}/export"
-          mkdir -p "$EXPORT_DIR/Payload"
-          cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
-          cd "$EXPORT_DIR"
+          echo "App found at: $APP_PATH"
+          EXPORT_DIR="${RUNNER_TEMP}/export"
+          mkdir -p "${EXPORT_DIR}/Payload"
+          cp -R "$APP_PATH" "${EXPORT_DIR}/Payload/"
+          cd "${EXPORT_DIR}"
           zip -r SocialApp.ipa Payload/
-          echo "IPA created!"
-        continue-on-error: true
+          ls -lh SocialApp.ipa
 
       # Upload artifacts
-      - name: Upload .app files
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SocialApp-BuildOutput
           path: |
             ${{ runner.temp }}/DerivedData/Build/Products/**/SocialApp.app
             ${{ runner.temp }}/export/*.ipa
-          if-no-files-found: ignore
+          if-no-files-found: error
